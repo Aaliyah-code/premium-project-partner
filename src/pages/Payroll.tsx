@@ -1,13 +1,19 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useEmployees } from "@/contexts/EmployeeContext";
-import { DataTable } from "@/components/ui/data-table";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { PayslipModal } from "@/components/payroll/PayslipModal";
-import { Search, FileText, TrendingUp, DollarSign, Clock } from "lucide-react";
+import { PayrollCard } from "@/components/payroll/PayrollCard";
+import { Search, DollarSign, TrendingUp, Clock, Users } from "lucide-react";
 import { Employee, PayrollRecord } from "@/data/employees";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Payroll() {
   const { employees, payroll, getEmployeeById } = useEmployees();
@@ -15,104 +21,70 @@ export default function Payroll() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollRecord | null>(null);
   const [payslipOpen, setPayslipOpen] = useState(false);
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+
+  // Get unique departments
+  const departments = [...new Set(employees.map((e) => e.department))];
 
   // Combine employee and payroll data
   const payrollData = payroll.map((pay) => {
     const employee = getEmployeeById(pay.employeeId);
     return {
-      ...pay,
-      name: employee?.name || "Unknown",
-      position: employee?.position || "",
-      department: employee?.department || "",
-      baseSalary: employee?.salary || 0,
+      payroll: pay,
+      employee: employee!,
     };
+  }).filter((item) => item.employee);
+
+  const filteredPayroll = payrollData.filter((item) => {
+    const matchesSearch = item.employee.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesDepartment = departmentFilter === "all" || item.employee.department === departmentFilter;
+    return matchesSearch && matchesDepartment;
   });
 
-  const filteredPayroll = payrollData.filter((record) =>
-    record.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handleViewPayslip = (record: typeof payrollData[0]) => {
-    const employee = getEmployeeById(record.employeeId);
-    const payrollRecord = payroll.find((p) => p.employeeId === record.employeeId);
-    if (employee && payrollRecord) {
-      setSelectedEmployee(employee);
-      setSelectedPayroll(payrollRecord);
-      setPayslipOpen(true);
-    }
+  const handleViewPayslip = (employee: Employee, payrollRecord: PayrollRecord) => {
+    setSelectedEmployee(employee);
+    setSelectedPayroll(payrollRecord);
+    setPayslipOpen(true);
   };
 
   // Calculate summary stats
   const totalPayroll = payroll.reduce((acc, p) => acc + p.finalSalary, 0);
   const totalHours = payroll.reduce((acc, p) => acc + p.hoursWorked, 0);
   const avgSalary = totalPayroll / payroll.length;
-  const totalDeductions = payroll.reduce((acc, p) => acc + p.leaveDeductions, 0);
+  const totalEmployees = payroll.length;
 
-  const columns = [
+  const summaryCards = [
     {
-      header: "Employee",
-      accessor: (row: (typeof payrollData)[0]) => (
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-sm font-semibold text-primary">
-              {row.name.split(" ").map((n) => n[0]).join("")}
-            </span>
-          </div>
-          <div>
-            <p className="font-medium">{row.name}</p>
-            <p className="text-sm text-muted-foreground">{row.position}</p>
-          </div>
-        </div>
-      ),
+      title: "Total Payroll",
+      value: `R${(totalPayroll / 1000).toFixed(0)}K`,
+      subtitle: "This month",
+      icon: DollarSign,
+      gradient: "from-primary/20 to-primary/5",
+      iconColor: "text-primary",
     },
     {
-      header: "Department",
-      accessor: "department" as keyof (typeof payrollData)[0],
+      title: "Average Salary",
+      value: `R${avgSalary.toLocaleString()}`,
+      subtitle: "Per employee",
+      icon: TrendingUp,
+      gradient: "from-success/20 to-success/5",
+      iconColor: "text-success",
     },
     {
-      header: "Hours Worked",
-      accessor: (row: (typeof payrollData)[0]) => (
-        <span className="font-medium">{row.hoursWorked} hrs</span>
-      ),
+      title: "Total Hours",
+      value: totalHours.toLocaleString(),
+      subtitle: "Hours worked",
+      icon: Clock,
+      gradient: "from-warning/20 to-warning/5",
+      iconColor: "text-warning",
     },
     {
-      header: "Leave Deductions",
-      accessor: (row: (typeof payrollData)[0]) => (
-        <span className="text-muted-foreground">{row.leaveDeductions} hrs</span>
-      ),
-    },
-    {
-      header: "Base Salary",
-      accessor: (row: (typeof payrollData)[0]) => (
-        <span className="text-muted-foreground">
-          R{row.baseSalary.toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      header: "Final Salary",
-      accessor: (row: (typeof payrollData)[0]) => (
-        <span className="font-semibold text-success">
-          R{row.finalSalary.toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      header: "Actions",
-      accessor: (row: (typeof payrollData)[0]) => (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleViewPayslip(row);
-          }}
-          className="gap-2"
-        >
-          <FileText className="h-4 w-4" />
-          View Payslip
-        </Button>
-      ),
+      title: "Employees",
+      value: totalEmployees,
+      subtitle: "Active payroll",
+      icon: Users,
+      gradient: "from-accent/20 to-accent/5",
+      iconColor: "text-accent",
     },
   ];
 
@@ -122,63 +94,30 @@ export default function Payroll() {
       subtitle="View and manage employee salaries and generate payslips"
     >
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="shadow-soft border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-primary" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {summaryCards.map((card, index) => (
+          <Card 
+            key={card.title} 
+            className="border-border/50 shadow-soft overflow-hidden animate-fade-in"
+            style={{ animationDelay: `${index * 50}ms` }}
+          >
+            <CardContent className="p-5">
+              <div className="flex items-center gap-4">
+                <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${card.gradient} flex items-center justify-center`}>
+                  <card.icon className={`h-6 w-6 ${card.iconColor}`} />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{card.value}</p>
+                  <p className="text-sm text-muted-foreground">{card.title}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">R{(totalPayroll / 1000).toFixed(0)}K</p>
-                <p className="text-sm text-muted-foreground">Total Payroll</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-soft border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-success/10 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-success" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">R{avgSalary.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">Average Salary</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-soft border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-accent" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{totalHours}</p>
-                <p className="text-sm text-muted-foreground">Total Hours</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-soft border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-warning/10 flex items-center justify-center">
-                <FileText className="h-5 w-5 text-warning" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{totalDeductions} hrs</p>
-                <p className="text-sm text-muted-foreground">Total Deductions</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Search */}
-      <div className="flex mb-6">
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -188,21 +127,39 @@ export default function Payroll() {
             className="pl-9"
           />
         </div>
+        <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="All Departments" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Departments</SelectItem>
+            {departments.map((dept) => (
+              <SelectItem key={dept} value={dept}>
+                {dept}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Payroll Table */}
-      <Card className="shadow-soft border-border/50">
-        <CardHeader>
-          <CardTitle>December 2025 Payroll</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            data={filteredPayroll}
-            columns={columns}
-            onRowClick={handleViewPayslip}
+      {/* Payroll Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {filteredPayroll.map((item, index) => (
+          <PayrollCard
+            key={item.employee.employeeId}
+            employee={item.employee}
+            payroll={item.payroll}
+            onViewPayslip={() => handleViewPayslip(item.employee, item.payroll)}
+            delay={index * 50}
           />
-        </CardContent>
-      </Card>
+        ))}
+      </div>
+
+      {filteredPayroll.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">No payroll records found</p>
+        </div>
+      )}
 
       {/* Payslip Modal */}
       <PayslipModal

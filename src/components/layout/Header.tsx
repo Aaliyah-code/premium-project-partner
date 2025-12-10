@@ -1,7 +1,16 @@
-import { Moon, Sun, Bell } from "lucide-react";
+import { Moon, Sun, Bell, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useNavigate } from "react-router-dom";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface HeaderProps {
   title: string;
@@ -10,6 +19,19 @@ interface HeaderProps {
 
 export function Header({ title, subtitle }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  const userInitials = user?.name
+    ?.split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase() || "HR";
 
   return (
     <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border">
@@ -41,19 +63,34 @@ export function Header({ title, subtitle }: HeaderProps) {
             <Moon className={`h-5 w-5 absolute transition-all duration-300 ${theme === 'dark' ? 'rotate-0 scale-100' : '-rotate-90 scale-0'}`} />
           </Button>
 
-          {/* User Avatar */}
-          <div className="flex items-center gap-3 pl-3 border-l border-border">
-            <Avatar className="h-9 w-9">
-              <AvatarImage src="" alt="Admin" />
-              <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
-                HR
-              </AvatarFallback>
-            </Avatar>
-            <div className="hidden md:block">
-              <p className="text-sm font-medium text-foreground">HR Admin</p>
-              <p className="text-xs text-muted-foreground">Administrator</p>
-            </div>
-          </div>
+          {/* User Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div className="flex items-center gap-3 pl-3 border-l border-border cursor-pointer hover:opacity-80 transition-opacity">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src="" alt={user?.name || "User"} />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden md:block">
+                  <p className="text-sm font-medium text-foreground">{user?.name || "HR Admin"}</p>
+                  <p className="text-xs text-muted-foreground">{user?.role || "Administrator"}</p>
+                </div>
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <div className="px-2 py-1.5">
+                <p className="text-sm font-medium">{user?.name}</p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>
